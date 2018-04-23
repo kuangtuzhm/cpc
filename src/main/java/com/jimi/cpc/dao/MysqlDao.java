@@ -63,7 +63,7 @@ public class MysqlDao {
      * @param threadNum 处理线程数
      * @param day_num   查询前几天
      */
-    public void search(TransferQueue<Map<String, List>> queue, int threadNum, int day_num) {
+    public void search(TransferQueue<Map<String, List<String>>> queue, int threadNum, int day_num) {
         Connection conn = null;
         try {
             long beginTime = System.currentTimeMillis();
@@ -80,10 +80,8 @@ public class MysqlDao {
                 table_name1 = "wifi_location_" + beferMonth;
             }
             List<String> meta_infos = getMySqlMeta(conn, table_name2);
-            System.out.println("database.size:" + meta_infos.size());
-            Map<String, List> imeiData = new HashMap<String, List>();
-            List<String> list1 = new ArrayList<String>(); //1都表示上个月的
-            List<String> list2 = new ArrayList<String>(); //2都表示当前月的
+            log.debug("database.size:" + meta_infos.size());
+            Map<String, List<String>> imeiData = new HashMap<>();
             int table1_sum = 0;
             int table2_sum = 0;
             //循环表的所有库
@@ -115,7 +113,7 @@ public class MysqlDao {
                         //--第一批，先查询设备号
                         if (lastImei2 == null) {
                             sql2 = "select device_imei from " + table2 + " where gate_time>='" + beginDate + "' order by device_imei limit " + batchNum;
-                            System.out.println(sql2);
+                            log.debug("sql2="+sql2);
                             stmt = conn.prepareStatement(sql2);
                             res = stmt.executeQuery();
                             while (res.next()) {
@@ -131,7 +129,7 @@ public class MysqlDao {
                             }
                         } else {//第二批后的数据
                             sql2 = "select device_imei from " + table2 + " where gate_time>='" + beginDate + "'and device_imei>'" + lastImei2 + "' order by device_imei limit " + batchNum;
-                            System.out.println(sql2);
+                            log.debug(sql2);
                             stmt = conn.prepareStatement(sql2);
                             res = stmt.executeQuery();
                             String maxImei = null;
@@ -148,7 +146,7 @@ public class MysqlDao {
                             }
                             lastImei2 = maxImei;
                         }
-                        System.out.println(sql2);
+                        log.debug(sql2);
                         stmt = conn.prepareStatement(sql2);
                         res = stmt.executeQuery();
 //                        System.out.println("2 task time:" + (System.currentTimeMillis() - startTime));
@@ -168,50 +166,23 @@ public class MysqlDao {
                                     line += "\t" + res.getString(k);
                                 }
                             }
+                            
                             currentImei2 = res.getString("device_imei");
-                            //非第一次，而且与上次的lastImei不相等，说明上次的imei数据已经查询完毕
-                            if (lastImei2 != null && !currentImei2.equals(lastImei2) && list2.size() > 0) {
-                                List<String> dataList1 = imeiData.get(lastImei2);
-                                if (dataList1 == null) {
-                                    imeiData.put(lastImei2, list2);
-                                } else {
-                                    list2.addAll(dataList1); //合并跨表数据
-                                    imeiData.put(lastImei2, list2);
-                                }
-                                list2 = new ArrayList<String>();
-                            }
-                            list2.add(line);
-                            lastImei2 = currentImei2;
-                            /*if (lastImei2 != null && !currentImei2.equals(lastImei2) && list2.size() > 0) {
-                                //重新组装数据
-                                List<String> dataList1 = imeiData.get(lastImei2);
-                                if (dataList1 == null) {
-                                    imeiData.put(lastImei2, list2);
-                                } else {
-                                    list2.addAll(dataList1); //合并跨表数据
-                                    imeiData.put(lastImei2, list2);
-                                }
-                                list2 = new ArrayList<String>();
-                            }
-                            list2.add(line);*/
+                            List<String> dataList2 = imeiData.get(currentImei2);
+                            if (dataList2 == null) {
+                            	dataList2 = new ArrayList<String>();
+                            	imeiData.put(currentImei2, dataList2);
+                            } 
+                            dataList2.add(line);
+
                         }
-                        if (list2.size() > 0) { //如果全部数据只包含一个imei
-                            List<String> dataList1 = imeiData.get(lastImei2);
-                            if (dataList1 == null) {
-                                imeiData.put(lastImei2, list2);
-                            } else {
-                                list2.addAll(dataList1);
-                                imeiData.put(lastImei2, list2);
-                            }
-                            list2 = new ArrayList<String>();
-                        }
+
                         res.close();
                         stmt.close();
                         //---------合并上一个月------------
                         String currentImei1 = null;
-                        String lastImei1 = null;
                         if (sql1 != null) {
-                            System.out.println(sql1);
+                        	log.debug(sql1);
                             stmt = conn.prepareStatement(sql1);
                             res = stmt.executeQuery();
                             colCount = res.getMetaData().getColumnCount();
@@ -227,36 +198,19 @@ public class MysqlDao {
                                     }
                                 }
                                 currentImei1 = res.getString("device_imei");
-                                //非第一次，而且与上次的lastImei不相等，说明上次的imei数据已经查询完毕
-                                if (lastImei1 != null && !currentImei1.equals(lastImei1) && list1.size() > 0) {
-                                    List<String> dataList2 = imeiData.get(lastImei1);
-                                    if (dataList2 == null) {
-                                        imeiData.put(lastImei1, list1);
-                                    } else {
-                                        list1.addAll(dataList2);
-                                        imeiData.put(lastImei1, list1);
-                                    }
-                                    list1 = new ArrayList<String>();
-                                }
-                                list1.add(line);
-                                lastImei1 = currentImei1;
+                                List<String> dataList1 = imeiData.get(currentImei1);
+                                if (dataList1 == null) {
+                                	dataList1 = new ArrayList<String>();
+                                	imeiData.put(currentImei1, dataList1);
+                                } 
+                                dataList1.add(line);
                             }
                             res.close();
                             stmt.close();
                         }
-                        if (list1.size() > 0) {
-                            List<String> dataList2 = imeiData.get(lastImei1);
-                            if (dataList2 == null) {
-                                imeiData.put(lastImei1, list1);
-                            } else {
-                                list1.addAll(dataList2);
-                                imeiData.put(lastImei1, list1);
-                            }
-                            list1 = new ArrayList<String>();
-                        }
                         //已按imei分组好数据，入队进行计算
                        queue.transfer(imeiData);
-                        imeiData = new HashMap<String, List>();
+                       imeiData = new HashMap<String, List<String>>();
                         //---数据查询异常
                         if (!haveData) {
                             log.error("数据查询异常:count: " + count1 + ",totalNum: " + totalNum);
@@ -269,7 +223,7 @@ public class MysqlDao {
             }
             //查询数据，发送完成指令，让各线程善后(如释放资源)
             for (int i = 0; i < threadNum; i++) {
-                imeiData.put("finish", list2);
+                imeiData.put("finish", new ArrayList<String>());
                 queue.transfer(imeiData);
             }
             //----验证数据条数
@@ -321,7 +275,7 @@ public class MysqlDao {
             PreparedStatement stmt = conn.prepareStatement(sql);
             ResultSet res = stmt.executeQuery();
             List<String> table_schema = new ArrayList<>();
-            System.out.println(sql);
+            log.debug(sql);
             while (res.next()) {
                 String database = res.getString(1);
                 String table_name = res.getString(2);
