@@ -2,6 +2,7 @@ package com.jimi.cpc.dao;
 
 import com.jimi.cpc.util.DateUtil;
 import com.jimi.cpc.util.PropertiesUtils;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -227,34 +228,59 @@ public class MysqlDao {
                 queue.transfer(imeiData);
             }
             //----验证数据条数
-            Connection myConn=getMyCatConn();
-            String sql = "select count(*) from " + table_name2.replace("'","")+ " where gate_time>='" + beginDate + "'";
-            stmt = myConn.prepareStatement(sql);
-            res = stmt.executeQuery();
-            int totalNum2=0;
-            int totalNum1=0;
-            if (res.next()) {
-                totalNum2 = res.getInt(1);
-            }
+			Connection myConn = null;
+			int totalNum2 = 0;
+			int totalNum1 = 0;
+			try {
+				myConn = getMyCatConn();
+				String sql = "select count(*) from " + table_name2.replace("'","")+ " where gate_time>='" + beginDate + "'";
+				stmt = myConn.prepareStatement(sql);
+				res = stmt.executeQuery();
+				if (res.next()) {
+				    totalNum2 = res.getInt(1);
+				}
 
-            if (table_name1!=null){
-                sql = "select count(*) from " + table_name1+ " where gate_time>='" + beginDate + "'";
-                stmt = myConn.prepareStatement(sql);
-                res = stmt.executeQuery();
-                if (res.next()) {
-                    totalNum1 = res.getInt(1);
-                }
-            }
+				if (table_name1!=null){
+				    sql = "select count(*) from " + table_name1+ " where gate_time>='" + beginDate + "'";
+				    stmt = myConn.prepareStatement(sql);
+				    res = stmt.executeQuery();
+				    if (res.next()) {
+				        totalNum1 = res.getInt(1);
+				    }
+				}
+			} catch (Exception e) {
+				log.error("验证数据条数数据库查询异常:" + e.getMessage());
+			} finally
+			{
+				res.close();
+	            stmt.close();
+	            myConn.close();
+			}
+            
             log.info("all data load finish task time:" + (System.currentTimeMillis() - beginTime) + " mycat table1 sum:" + totalNum1+" mysql table1 sum:"+table1_sum+" table1_sum=totalNum1?"+(table1_sum==totalNum1)+ " mycat table2 sum:" + totalNum2+" mysql table2 sum:"+table2_sum+" table2_sum=totalNum2?"+(table2_sum==totalNum2));
         } catch (Exception e) {
             log.error("mysql数据查询异常:" + e.getMessage());
-            e.printStackTrace();
+            Map<String, List<String>> imeiData = new HashMap<>();
+            imeiData.put("finish", new ArrayList<String>());
+            try {
+				queue.transfer(imeiData);
+			} catch (InterruptedException e1) {
+				log.error("发送异常结束信号异常:" + e.getMessage());
+			}
         } finally {
             if (conn != null) {
                 try {
                     conn.close();
                 } catch (Exception e) {
-                    e.printStackTrace();
+                	log.error("数据库关闭连接异常:" + e.getMessage());
+                	
+                	Map<String, List<String>> imeiData = new HashMap<>();
+                    imeiData.put("finish", new ArrayList<String>());
+                    try {
+        				queue.transfer(imeiData);
+        			} catch (InterruptedException e1) {
+        				log.error("发送异常结束信号异常:" + e.getMessage());
+        			}
                 }
             }
         }

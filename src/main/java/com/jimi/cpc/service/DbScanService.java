@@ -9,6 +9,7 @@ import com.jimi.cpc.util.DateUtil;
 import com.jimi.cpc.util.GpsUtils;
 import com.jimi.cpc.util.PoiUtils;
 import com.jimi.cpc.util.PropertiesUtils;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,7 +56,7 @@ public class DbScanService {
 
     public void task() throws Exception {
         long beginTime = System.currentTimeMillis();
-        TransferQueue queue = new LinkedTransferQueue();
+        TransferQueue<Map<String, List<String>>> queue = new LinkedTransferQueue<>();
         int threadNum = Integer.parseInt(propertiesUtils.get("dbscan.handleThread.num"));
         ExecutorService executor = Executors.newFixedThreadPool(threadNum);
         CountDownLatch latch = new CountDownLatch(threadNum);
@@ -72,10 +73,10 @@ public class DbScanService {
     }
 
     class HandleData implements Runnable {
-        private TransferQueue<Map<String, List>> queue;
+        private TransferQueue<Map<String, List<String>>> queue;
         private CountDownLatch latch;
 
-        public HandleData(TransferQueue<Map<String, List>> queue, CountDownLatch latch) {
+        public HandleData(TransferQueue<Map<String, List<String>>> queue, CountDownLatch latch) {
             this.queue = queue;
             this.latch = latch;
         }
@@ -85,7 +86,7 @@ public class DbScanService {
             try {
                 long beginTime = System.currentTimeMillis();
                 while (true) {
-                    Map<String, List> line = queue.poll(5, TimeUnit.SECONDS);
+                    Map<String, List<String>> line = queue.poll(5, TimeUnit.SECONDS);
                     if (line != null) {
                         if (line.keySet().contains("finish")) {
                             break;
@@ -104,7 +105,7 @@ public class DbScanService {
     /**
      * @param mysqlData 是一个imei的包括mysql数据
      */
-    public void handle(Map<String, List> mysqlData) {
+    public void handle(Map<String, List<String>> mysqlData) {
         for (String imei : mysqlData.keySet()) {
             List<String> dataList = mysqlData.get(imei);
             System.out.println(imei + ":" + dataList.size());
