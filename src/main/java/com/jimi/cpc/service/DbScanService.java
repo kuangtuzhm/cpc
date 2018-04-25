@@ -79,6 +79,8 @@ public class DbScanService {
         latch.await();
         esDao.close();
         executor.shutdown();
+        activation_producer.shutdown();
+        activation_producer = null;
         log.info("-----dbscan all hadle finish-----task time: " + (System.currentTimeMillis() - beginTime));
     }
 
