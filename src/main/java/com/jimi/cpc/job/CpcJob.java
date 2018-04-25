@@ -14,9 +14,7 @@ public class CpcJob implements Job {
     public void execute(JobExecutionContext context){
         try {
             log.info("-----job start----");
-            JobDataMap data = context.getJobDetail().getJobDataMap();
-            String path=data.get("config").toString();
-            CpcService cpcService=new CpcService(path);
+            CpcService cpcService=new CpcService();
             cpcService.task();
         }catch (Exception e){
             e.printStackTrace();

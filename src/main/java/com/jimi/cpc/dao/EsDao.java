@@ -3,11 +3,9 @@ package com.jimi.cpc.dao;
 import java.net.InetSocketAddress;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 import org.elasticsearch.action.bulk.BulkItemResponse;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
@@ -30,7 +28,7 @@ import org.slf4j.LoggerFactory;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
-import com.jimi.cpc.util.PropertiesUtils;
+import com.jimi.cpc.util.SysConfigUtil;
 
 /**
  * es 数据存取
@@ -38,15 +36,13 @@ import com.jimi.cpc.util.PropertiesUtils;
  */
 public class EsDao {
     private static final Logger log = LoggerFactory.getLogger(EsDao.class);
-    private PropertiesUtils propertiesUtils = null;
     private Client client = null;
 
-    public EsDao(PropertiesUtils propertiesUtils) {
-        this.propertiesUtils = propertiesUtils;
+    public EsDao() {
         try {
-            String host = propertiesUtils.get("es.mater.ip");
-            int port = Integer.parseInt(propertiesUtils.get("es.mater.port"));
-            String cluster = propertiesUtils.get("es.cluster.name");
+            String host = SysConfigUtil.getString("es.mater.ip");
+            int port = SysConfigUtil.getInt("es.mater.port");
+            String cluster = SysConfigUtil.getString("es.cluster.name");
             Settings settings = Settings.settingsBuilder()
                     .put("cluster.name", cluster).build();
             this.client = TransportClient.builder().settings(settings).build()
@@ -57,8 +53,8 @@ public class EsDao {
     }
 
     public static void main(String[] args) {
-        PropertiesUtils propertiesUtils = new PropertiesUtils("E:\\IdeaProjects\\cpc\\src\\main\\resources\\param.properties");
-        EsDao esDao = new EsDao(propertiesUtils);
+
+        EsDao esDao = new EsDao();
         String index = "wifi_group";
         String type = "wifi";
         String imei = "688897215570568";

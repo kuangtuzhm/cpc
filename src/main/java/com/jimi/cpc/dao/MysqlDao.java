@@ -1,7 +1,7 @@
 package com.jimi.cpc.dao;
 
 import com.jimi.cpc.util.DateUtil;
-import com.jimi.cpc.util.PropertiesUtils;
+import com.jimi.cpc.util.SysConfigUtil;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,19 +21,15 @@ import java.util.concurrent.TransferQueue;
  * @author  yuanshao
  */
 public class MysqlDao {
+	
     private static final Logger log = LoggerFactory.getLogger(MysqlDao.class);
-    private PropertiesUtils propertiesUtils = null;
-
-    public MysqlDao(PropertiesUtils propertiesUtils) {
-        this.propertiesUtils = propertiesUtils;
-    }
 
     public Connection getMySqlConn() {
         try {
-            String driverName = propertiesUtils.get("mysql.jdbc.driverName");
-            String url = propertiesUtils.get("mysql.jdbc.url");
-            String user = propertiesUtils.get("mysql.jdbc.user");
-            String password = propertiesUtils.get("mysql.jdbc.password");
+            String driverName = SysConfigUtil.getString("mysql.jdbc.driverName");
+            String url = SysConfigUtil.getString("mysql.jdbc.url");
+            String user = SysConfigUtil.getString("mysql.jdbc.user");
+            String password = SysConfigUtil.getString("mysql.jdbc.password");
             Class.forName(driverName);
             Connection conn = DriverManager.getConnection(url, user, password);
             return conn;
@@ -45,10 +41,10 @@ public class MysqlDao {
     }
     public Connection getMyCatConn() {
         try {
-            String driverName = propertiesUtils.get("mycat.jdbc.driverName");
-            String url = propertiesUtils.get("mycat.jdbc.url");
-            String user = propertiesUtils.get("mycat.jdbc.user");
-            String password = propertiesUtils.get("mycat.jdbc.password");
+            String driverName = SysConfigUtil.getString("mycat.jdbc.driverName");
+            String url = SysConfigUtil.getString("mycat.jdbc.url");
+            String user = SysConfigUtil.getString("mycat.jdbc.user");
+            String password = SysConfigUtil.getString("mycat.jdbc.password");
             Class.forName(driverName);
             Connection conn = DriverManager.getConnection(url, user, password);
             return conn;
@@ -204,11 +200,11 @@ public class MysqlDao {
                 }
                 if(table1 == null)
                 {
-                	log.info("数据表="+table2+"数据总量table_data_sum="+table_data_sum);
+                	log.info("数据表="+table2+"数据总量table_data_sum="+table_data_sum+";task 耗时"+(System.currentTimeMillis() - beginTime2));
                 }
                 else
                 {
-                	log.info("数据表="+table1+","+table2+"数据总量table_data_sum="+table_data_sum);
+                	log.info("数据表="+table1+","+table2+"数据总量table_data_sum="+table_data_sum+";task 耗时"+(System.currentTimeMillis() - beginTime2));
                 }
                 /*
                 //----查询表数据量
@@ -336,6 +332,7 @@ public class MysqlDao {
                         log.info(" count: " + count2 + " totalNum: " + totalNum + " this batch tasks:" + (System.currentTimeMillis() - startTime) + " lastImei:" + lastImei2);
                     }
                 }
+                
                 log.info(table2 + " task time:" + (System.currentTimeMillis() - beginTime2) + " count:" + count2 + " totalNum:" + totalNum + " " + (count2 == totalNum));
             	*/
             }

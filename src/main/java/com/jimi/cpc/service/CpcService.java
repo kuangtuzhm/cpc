@@ -4,7 +4,7 @@ import com.jimi.cpc.dao.EsDao;
 import com.jimi.cpc.dao.MysqlDao;
 import com.jimi.cpc.util.DateUtil;
 import com.jimi.cpc.util.GpsUtils;
-import com.jimi.cpc.util.PropertiesUtils;
+import com.jimi.cpc.util.SysConfigUtil;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,27 +17,21 @@ public class CpcService {
     private EsDao esDao;
     private String index = null;
     private String type = null;
-    private PropertiesUtils propertiesUtils = null;
     private int batchNum = 2000;
     private int radius;
 
     //    private DecimalFormat df=new DecimalFormat(".#######");
-    public CpcService(String configPath) {
-        this.propertiesUtils = new PropertiesUtils(configPath);
-        this.radius = Integer.parseInt(propertiesUtils.get("manual.cpc.radius"));
-        this.esDao = new EsDao(propertiesUtils);
-        this.index = propertiesUtils.get("es.index.name").trim();
-        this.type = propertiesUtils.get("es.index.type").trim();
-        this.batchNum = Integer.parseInt(propertiesUtils.get("manual.cpc.batchNum"));
+    public CpcService() {
+        this.radius = SysConfigUtil.getInt("manual.cpc.radius");
+        this.esDao = new EsDao();
+        this.index = SysConfigUtil.getString("es.index.name").trim();
+        this.type = SysConfigUtil.getString("es.index.type").trim();
+        this.batchNum = SysConfigUtil.getInt("manual.cpc.batchNum");
     }
 
     public static void main(String[] args) throws Exception {
-    	String path = null;
-    	if(args != null && args.length > 0)
-    	{
-    		path = args[0];
-    	}
-        CpcService cpcService = new CpcService(path);
+
+        CpcService cpcService = new CpcService();
         /*cpcService.esDao.insertWifiLocation();*/
         cpcService.task();
     }
@@ -45,14 +39,14 @@ public class CpcService {
     public void task() throws Exception {
         long beginTime = System.currentTimeMillis();
         TransferQueue<Map<String, List<String>>> queue = new LinkedTransferQueue<>();
-        int threadNum = Integer.parseInt(propertiesUtils.get("dbscan.handleThread.num"));
+        int threadNum = SysConfigUtil.getInt("dbscan.handleThread.num");
         ExecutorService executor = Executors.newFixedThreadPool(threadNum);
         CountDownLatch latch = new CountDownLatch(threadNum);
         for (int i = 0; i < threadNum; i++) {
             executor.execute(new CpcService.HandleData(queue, latch));
         }
-        MysqlDao dao = new MysqlDao(propertiesUtils);
-        int day_num = Integer.parseInt(propertiesUtils.get("manual.cpc.day"));
+        MysqlDao dao = new MysqlDao();
+        int day_num = SysConfigUtil.getInt("manual.cpc.day");
         dao.search(queue, threadNum,day_num,batchNum);
         latch.await();
         esDao.close();

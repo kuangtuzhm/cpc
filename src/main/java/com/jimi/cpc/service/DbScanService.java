@@ -8,7 +8,10 @@ import com.jimi.cpc.dbscan.Point;
 import com.jimi.cpc.util.DateUtil;
 import com.jimi.cpc.util.GpsUtils;
 import com.jimi.cpc.util.PoiUtils;
-import com.jimi.cpc.util.PropertiesUtils;
+import com.jimi.cpc.util.SysConfigUtil;
+import com.jimi.cpc.util.mq.ActiveMQProducer;
+import com.jimi.cpc.util.mq.JMSMode;
+import com.jimi.cpc.util.mq.MqConstants;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,12 +20,17 @@ import java.util.*;
 import java.util.concurrent.*;
 
 public class DbScanService {
+	
     private static final Logger log = LoggerFactory.getLogger(DbScanService.class);
+    
+    
+    private static ActiveMQProducer activation_producer = ActiveMQProducer.getInstance(MqConstants.MQ_CPC, MqConstants.MQ_PRODUCER,
+			JMSMode.QUEUE, true);
+    
     private DBScan dbScan;
     private EsDao esDao;
     private String index = null;
     private String type = null;
-    private PropertiesUtils propertiesUtils = null;
     private int threshold;
     private String compareStartTime = null;
     private String compareEndTime = null;
@@ -32,42 +40,41 @@ public class DbScanService {
     private int batchNum = 2000;
     
     //    private DecimalFormat df=new DecimalFormat(".#######");
-    public DbScanService(String configPath) {
-        this.propertiesUtils = new PropertiesUtils(configPath);
-        this.radius = Integer.parseInt(propertiesUtils.get("dbscan.radius").trim());
-        int minPts = Integer.parseInt(propertiesUtils.get("dbscan.minPts").trim());
-        String month = propertiesUtils.get("compare_range_month");
+    public DbScanService() {
+        this.radius = SysConfigUtil.getInt("dbscan.radius");
+        int minPts = SysConfigUtil.getInt("dbscan.minPts");
+        String month = SysConfigUtil.getString("compare_range_month");
         if (month != null) {
             int compareMonth = Integer.parseInt(month.trim());
             this.compareStartTime = DateUtil.getMonthBefore(compareMonth);
             this.compareEndTime = DateUtil.getTimeNow();
         }
-        this.threshold = Integer.parseInt(propertiesUtils.get("gps.center.threshold").trim());
+        this.threshold = SysConfigUtil.getInt("gps.center.threshold");
         this.dbScan = new DBScan(radius, minPts);
-        this.esDao = new EsDao(propertiesUtils);
-        this.index = propertiesUtils.get("es.index.name").trim();
-        this.type = propertiesUtils.get("es.index.type").trim();
-        this.geoUrl = propertiesUtils.get("geocoder.url").trim();
-        this.geoToken = propertiesUtils.get("geocoder.token").trim();
-        this.batchNum = Integer.parseInt(propertiesUtils.get("manual.cpc.batchNum"));
+        this.esDao = new EsDao();
+        this.index = SysConfigUtil.getString("es.index.name");
+        this.type = SysConfigUtil.getString("es.index.type");
+        this.geoUrl = SysConfigUtil.getString("geocoder.url");
+        this.geoToken = SysConfigUtil.getString("geocoder.token");
+        this.batchNum = SysConfigUtil.getInt("manual.cpc.batchNum");
     }
 
     public static void main(String[] args) throws Exception {
-        DbScanService dbScanServie = new DbScanService(args[0]);
+        DbScanService dbScanServie = new DbScanService();
         dbScanServie.task();
     }
 
     public void task() throws Exception {
         long beginTime = System.currentTimeMillis();
         TransferQueue<Map<String, List<String>>> queue = new LinkedTransferQueue<>();
-        int threadNum = Integer.parseInt(propertiesUtils.get("dbscan.handleThread.num"));
+        int threadNum = SysConfigUtil.getInt("dbscan.handleThread.num");
         ExecutorService executor = Executors.newFixedThreadPool(threadNum);
         CountDownLatch latch = new CountDownLatch(threadNum);
         for (int i = 0; i < threadNum; i++) {
             executor.execute(new HandleData(queue, latch));
         }
-        MysqlDao dao = new MysqlDao(propertiesUtils);
-        int day_num = Integer.parseInt(propertiesUtils.get("seach_day_num"));
+        MysqlDao dao = new MysqlDao();
+        int day_num = SysConfigUtil.getInt("seach_day_num");
         dao.search(queue, threadNum,day_num,batchNum);
         latch.await();
         esDao.close();
