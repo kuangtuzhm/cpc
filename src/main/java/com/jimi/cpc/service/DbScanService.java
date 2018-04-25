@@ -29,6 +29,8 @@ public class DbScanService {
     private String geoUrl = null;
     private String geoToken = null;
     private int radius;
+    private int batchNum = 2000;
+    
     //    private DecimalFormat df=new DecimalFormat(".#######");
     public DbScanService(String configPath) {
         this.propertiesUtils = new PropertiesUtils(configPath);
@@ -47,6 +49,7 @@ public class DbScanService {
         this.type = propertiesUtils.get("es.index.type").trim();
         this.geoUrl = propertiesUtils.get("geocoder.url").trim();
         this.geoToken = propertiesUtils.get("geocoder.token").trim();
+        this.batchNum = Integer.parseInt(propertiesUtils.get("manual.cpc.batchNum"));
     }
 
     public static void main(String[] args) throws Exception {
@@ -65,7 +68,7 @@ public class DbScanService {
         }
         MysqlDao dao = new MysqlDao(propertiesUtils);
         int day_num = Integer.parseInt(propertiesUtils.get("seach_day_num"));
-        dao.search(queue, threadNum,day_num);
+        dao.search(queue, threadNum,day_num,batchNum);
         latch.await();
         esDao.close();
         executor.shutdown();

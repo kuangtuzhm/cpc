@@ -18,6 +18,7 @@ public class CpcService {
     private String index = null;
     private String type = null;
     private PropertiesUtils propertiesUtils = null;
+    private int batchNum = 2000;
     private int radius;
 
     //    private DecimalFormat df=new DecimalFormat(".#######");
@@ -27,6 +28,7 @@ public class CpcService {
         this.esDao = new EsDao(propertiesUtils);
         this.index = propertiesUtils.get("es.index.name").trim();
         this.type = propertiesUtils.get("es.index.type").trim();
+        this.batchNum = Integer.parseInt(propertiesUtils.get("manual.cpc.batchNum"));
     }
 
     public static void main(String[] args) throws Exception {
@@ -51,7 +53,7 @@ public class CpcService {
         }
         MysqlDao dao = new MysqlDao(propertiesUtils);
         int day_num = Integer.parseInt(propertiesUtils.get("manual.cpc.day"));
-        dao.search(queue, threadNum,day_num);
+        dao.search(queue, threadNum,day_num,batchNum);
         latch.await();
         esDao.close();
         executor.shutdown();

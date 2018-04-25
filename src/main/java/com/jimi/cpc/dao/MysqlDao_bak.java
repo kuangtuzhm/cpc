@@ -20,11 +20,11 @@ import java.util.concurrent.TransferQueue;
  * mysql数据存取
  * @author  yuanshao
  */
-public class MysqlDao {
-    private static final Logger log = LoggerFactory.getLogger(MysqlDao.class);
+public class MysqlDao_bak {
+    private static final Logger log = LoggerFactory.getLogger(MysqlDao_bak.class);
     private PropertiesUtils propertiesUtils = null;
 
-    public MysqlDao(PropertiesUtils propertiesUtils) {
+    public MysqlDao_bak(PropertiesUtils propertiesUtils) {
         this.propertiesUtils = propertiesUtils;
     }
 
@@ -63,13 +63,13 @@ public class MysqlDao {
      * @param queue     队列
      * @param threadNum 处理线程数
      * @param day_num   查询前几天
-     * @param batchNum 每次查询的数量
      */
-    public void search(TransferQueue<Map<String, List<String>>> queue, int threadNum, int day_num, int batchNum) {
+    public void search(TransferQueue<Map<String, List<String>>> queue, int threadNum, int day_num) {
         Connection conn = null;
         try {
             long beginTime = System.currentTimeMillis();
             conn = getMySqlConn();
+            int batchNum = 10000; //每批查询数据量
             PreparedStatement stmt = null;
             ResultSet res = null;
             String beginDate = DateUtil.getDateBefore("yyyy-MM-dd", day_num);
@@ -83,10 +83,10 @@ public class MysqlDao {
             List<String> meta_infos = getMySqlMeta(conn, table_name2);
             log.debug("database.size:" + meta_infos.size());
             Map<String, List<String>> imeiData = new HashMap<>();
-            int data_sum = 0;
+            int table1_sum = 0;
+            int table2_sum = 0;
             //循环表的所有库
             for (String database_table : meta_infos) {
-            	int table_data_sum = 0;
                 long beginTime2 = System.currentTimeMillis();
                 String[] databaseTableArray = database_table.split("#");
                 String database = databaseTableArray[0];
@@ -95,122 +95,6 @@ public class MysqlDao {
                 if (table_name1 != null) {
                     table1 = "`" + database + "`." + table_name1;
                 }
-                String sqlMaxImei ="";
-                String sqlQuery="";
-                String lastImei = null;
-                String maxImei = null;
-                String line = null;
-                while(true)
-                {
-                	//获取最小imei
-                	if(table1 == null)
-                	{
-		                if(lastImei != null)
-		                {
-		                	sqlMaxImei = "select max(device_imei) from " + table2 + " where gate_time>='" + beginDate +"' and device_imei>'"+lastImei+"' order by device_imei limit " + batchNum;
-		                }
-		                else
-		                {
-		                	sqlMaxImei = "select max(device_imei) from " + table2 + " where gate_time>='" + beginDate +"' order by device_imei limit " + batchNum;
-		                }
-                	}
-	                else
-	                {
-	                	if(lastImei != null)
-	                	{
-	                		sqlMaxImei="SELECT max(device_imei) FROM (SELECT device_imei FROM "+table2+" where gate_time>='"+ beginDate +"' and device_imei>'"+lastImei+"'"
-		                			  +" UNION ALL "
-		                			  +"SELECT device_imei FROM "+table1+" where gate_time>='"+ beginDate +"' and device_imei>'"+lastImei+"' order by device_imei limit " + batchNum+") AS a";
-	                	}
-	                	else
-	                	{
-		                	sqlMaxImei="SELECT max(device_imei) FROM (SELECT device_imei FROM "+table2+" where gate_time>='"+ beginDate +"'"
-		                			  +" UNION ALL "
-		                			  +"SELECT device_imei FROM "+table1+" where gate_time>='"+ beginDate +"' order by device_imei limit " + batchNum+") AS a";
-	                	}
-	                }
-                	log.info("sqlMaxImei="+sqlMaxImei);
-	                stmt = conn.prepareStatement(sqlMaxImei);
-	                res = stmt.executeQuery();
-	                if (res.next()) {
-	                	maxImei = res.getString(1);
-	                }
-	                if(maxImei != null)
-	                {
-		                //获取表数据
-		                if(table1 == null)
-		                {
-		                	if(lastImei != null)
-		                	{
-		                		sqlQuery = "select id,device_imei,macs,lat,lng , gate_time from " + table2 + " where gate_time>='" + beginDate + "'and device_imei<='" + maxImei+ "' and device_imei>'"+lastImei+"'";
-		                	}
-		                	else
-		                	{
-		                		sqlQuery = "select id,device_imei,macs,lat,lng , gate_time from " + table2 + " where gate_time>='" + beginDate + "'and device_imei<='" + maxImei+ "'";
-		                	}
-		                	
-		                }
-		                else
-		                {
-		                	if(lastImei != null)
-		                	{
-		                		sqlQuery = "select id,device_imei,macs,lat,lng , gate_time from " + table2 + " where gate_time>='" + beginDate + "'and device_imei<='" + maxImei+"' and device_imei>'"+lastImei+"'"
-			                			 + " UNION ALL "
-			                			 + "select id,device_imei,macs,lat,lng , gate_time from " + table1 + " where gate_time>='" + beginDate + "'and device_imei<='" + maxImei+ "' and device_imei>'"+lastImei+"'";
-		                	}
-		                	else
-		                	{
-		                		sqlQuery = "select id,device_imei,macs,lat,lng , gate_time from " + table2 + " where gate_time>='" + beginDate + "'and device_imei<='" + maxImei+ "'"
-			                			 + " UNION ALL "
-			                			 + "select id,device_imei,macs,lat,lng , gate_time from " + table1 + " where gate_time>='" + beginDate + "'and device_imei<='" + maxImei+ "'";
-		                	}
-		                }
-		                lastImei = maxImei;
-		                log.info("sqlQuery="+sqlQuery);
-		                stmt = conn.prepareStatement(sqlQuery);
-                        res = stmt.executeQuery();
-                        int colCount = res.getMetaData().getColumnCount();
-                        //---组装成一行行数据
-                        String currentImei2 = null;
-                        while (res.next()) {
-                            data_sum++;
-                            table_data_sum++;
-                            for (int k = 1; k <= colCount; k++) {
-                                if (k == 1) {
-                                    line = res.getString(k);
-                                } else {
-                                    line += "\t" + res.getString(k);
-                                }
-                            }
-                            
-                            currentImei2 = res.getString("device_imei");
-                            List<String> dataList2 = imeiData.get(currentImei2);
-                            if (dataList2 == null) {
-                            	dataList2 = new ArrayList<String>();
-                            	imeiData.put(currentImei2, dataList2);
-                            } 
-                            dataList2.add(line);
-                        }
-                        res.close();
-                        stmt.close();
-                        //已按imei分组好数据，入队进行计算
-                        queue.transfer(imeiData);
-                        imeiData = new HashMap<String, List<String>>();
-	                }
-	                else
-	                {
-	                	break;
-	                }
-                }
-                if(table1 == null)
-                {
-                	log.info("数据表="+table2+"数据总量table_data_sum="+table_data_sum);
-                }
-                else
-                {
-                	log.info("数据表="+table1+","+table2+"数据总量table_data_sum="+table_data_sum);
-                }
-                /*
                 //----查询表数据量
                 String sql2 = "select count(*) from " + table2 + " where gate_time>='" + beginDate + "'";
                 String sql1 = null;
@@ -337,9 +221,7 @@ public class MysqlDao {
                     }
                 }
                 log.info(table2 + " task time:" + (System.currentTimeMillis() - beginTime2) + " count:" + count2 + " totalNum:" + totalNum + " " + (count2 == totalNum));
-            	*/
             }
-            
             //查询数据，发送完成指令，让各线程善后(如释放资源)
             for (int i = 0; i < threadNum; i++) {
                 imeiData.put("finish", new ArrayList<String>());
@@ -375,7 +257,7 @@ public class MysqlDao {
 	            myConn.close();
 			}
             
-            log.info("all data load finish task time:" + (System.currentTimeMillis() - beginTime) + " mycat table sum:" + (totalNum1+totalNum2)+" mysql table sum:"+data_sum);
+            log.info("all data load finish task time:" + (System.currentTimeMillis() - beginTime) + " mycat table1 sum:" + totalNum1+" mysql table1 sum:"+table1_sum+" table1_sum=totalNum1?"+(table1_sum==totalNum1)+ " mycat table2 sum:" + totalNum2+" mysql table2 sum:"+table2_sum+" table2_sum=totalNum2?"+(table2_sum==totalNum2));
         } catch (Exception e) {
             log.error("mysql数据查询异常:" + e.getMessage());
             Map<String, List<String>> imeiData = new HashMap<>();
