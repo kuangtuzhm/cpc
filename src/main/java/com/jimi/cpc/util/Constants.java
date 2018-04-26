@@ -14,7 +14,7 @@
  * http://www.jimilab.com/
  */
 
-package com.jimi.cpc.util.mq;
+package com.jimi.cpc.util;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -30,8 +30,12 @@ import com.jimi.cpc.util.SysConfigUtil;
  * @author yaojianping
  * @version 1.0
  */
-public class MqConstants {
+public class Constants {
 
+	/**
+	 * 设备所属项目与机型
+	 */
+	public static final String DC_IMEI_APPID="DC_IMEI_APPID";
 
 	public static final String MQ_URL = SysConfigUtil.getString("activemq.url");
 
@@ -40,8 +44,8 @@ public class MqConstants {
 	public static final String MQ_PWD = SysConfigUtil.getString("activemq.pwd");
 
 	public static final String MQ_CONSUMER = "consumer";
-	public static final String MQ_PRODUCER = "producer";
-	public static final String MQ_CPC = "cpc";
+	public static final String MQ_PRODUCER = "producer_cpc";
+	public static final String MQ_CPC_POSITION = "position.home.school";
 	
-	public static final String PROJECT_NAME = "CPC";
+	public static final String PROJECT_NAME = "TUQIANG";
 }

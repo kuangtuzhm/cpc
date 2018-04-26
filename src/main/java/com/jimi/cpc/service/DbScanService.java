@@ -1,18 +1,23 @@
 package com.jimi.cpc.service;
 
+import com.alibaba.fastjson.JSONObject;
 import com.jimi.cpc.dao.EsDao;
 import com.jimi.cpc.dao.MysqlDao;
 import com.jimi.cpc.dbscan.Cluster;
 import com.jimi.cpc.dbscan.DBScan;
 import com.jimi.cpc.dbscan.Point;
+import com.jimi.cpc.model.ImeiApp;
+import com.jimi.cpc.model.Point4MQ;
+import com.jimi.cpc.util.Constants;
 import com.jimi.cpc.util.DateUtil;
 import com.jimi.cpc.util.GpsUtils;
 import com.jimi.cpc.util.PoiUtils;
 import com.jimi.cpc.util.SysConfigUtil;
 import com.jimi.cpc.util.mq.ActiveMQProducer;
 import com.jimi.cpc.util.mq.JMSMode;
-import com.jimi.cpc.util.mq.MqConstants;
+import com.jimi.cpc.util.redis.MyJedis;
 
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,7 +29,7 @@ public class DbScanService {
     private static final Logger log = LoggerFactory.getLogger(DbScanService.class);
     
     
-    private static ActiveMQProducer activation_producer = ActiveMQProducer.getInstance(MqConstants.MQ_CPC, MqConstants.MQ_PRODUCER,
+    private static ActiveMQProducer activation_producer = ActiveMQProducer.getInstance(Constants.MQ_CPC_POSITION, Constants.MQ_PRODUCER,
 			JMSMode.QUEUE, true);
     
     private DBScan dbScan;
@@ -38,6 +43,7 @@ public class DbScanService {
     private String geoToken = null;
     private int radius;
     private int batchNum = 2000;
+    private int topN = 10;
     
     //    private DecimalFormat df=new DecimalFormat(".#######");
     public DbScanService() {
@@ -57,6 +63,7 @@ public class DbScanService {
         this.geoUrl = SysConfigUtil.getString("geocoder.url");
         this.geoToken = SysConfigUtil.getString("geocoder.token");
         this.batchNum = SysConfigUtil.getInt("manual.cpc.batchNum");
+        this.topN = SysConfigUtil.getInt("manual.cpc.topN");
     }
 
     public static void main(String[] args) throws Exception {
@@ -122,6 +129,17 @@ public class DbScanService {
             List<String> dataList = mysqlData.get(imei);
             System.out.println(imei + ":" + dataList.size());
             List<Point> pointList = new ArrayList<>();
+            boolean isTuQiang = false;
+            //判断imei是否属于图强项目
+            String imeiAppId = MyJedis.getInstance(0).hget(Constants.DC_IMEI_APPID, imei);
+            if(StringUtils.isNotEmpty(imeiAppId))
+            {
+            	ImeiApp imeiApp = JSONObject.parseObject(imeiAppId, ImeiApp.class);
+            	if("TUQIANG".equalsIgnoreCase(imeiApp.getAppId()))
+            	{
+            		isTuQiang = true;
+            	}
+            }
             for (String line : dataList) {
                 String[] row = line.split("\t");
                 int index = 0;
@@ -137,12 +155,22 @@ public class DbScanService {
             }
             dbScan.process(pointList);
             List<Cluster> clusters = dbScan.getCluster(pointList);
-            Iterator<Cluster> clusterIt = clusters.iterator();
+            List<Cluster> clustersData = clusters;
+            //对簇排序
+            if(null != clusters && clusters.size() > 1)
+            {
+            	Collections.sort(clusters);
+            	//只保留前topN条
+            	if(clusters.size() > topN)
+            	{
+            		clustersData = clusters.subList(0, topN);
+            	}
+            }
+            
+            //Iterator<Cluster> clusterIt = clustersData.iterator();
+
             //合并各聚类macs
-            while(clusterIt.hasNext()){
-            	Cluster cluster = clusterIt.next();
-           /* }
-            for (Cluster cluster : clusters) {*/
+            for(Cluster cluster : clustersData){
                 List<Point> points = cluster.getPlist();
                 String macs = "";
                 int belongMon = 0;  //属于早上的点
@@ -167,11 +195,15 @@ public class DbScanService {
                 log.info("早上百分比："+monPer+" 晚上百分比："+nigPer);
                 cluster.setCombineMacs(transMacs(macs.substring(1)));
             }
-            if (clusters.size() > 0) {
+            //定义家庭的数据
+            Point4MQ homeData = null;
+            //学校的数据
+            Point4MQ schoolData = null;
+            if (clustersData.size() > 0) {
                 //---验证是否存在考勤点，如果存在更新，否则新加
                 List<Map<String, Object>> esDataList = new ArrayList<>();
                 List<Map<String, Object>> historyDatas = esDao.search(index, type, imei, compareStartTime, compareEndTime);
-                for (Cluster cluster : clusters) {
+                for (Cluster cluster : clustersData) {
                     Point mean = cluster.getMean();
                     Map<String, Object> similarityData = null;
                     
@@ -209,49 +241,6 @@ public class DbScanService {
                         }
                     }
                     
-                    
-                    /*
-                    if (similarityData != null) {
-                        if (similarityData.get("is_valid").toString().equals("0")) {
-                            similarityData.put("lng", mean.getX());
-                            similarityData.put("lat", mean.getY());
-                            String latlng = mean.getY() + "," + mean.getX();
-                            String gname = PoiUtils.geocode2(geoUrl, geoToken, latlng);
-                            if (gname != null)
-                                similarityData.put("gname", gname);
-
-                        }
-                        similarityData.put("counts", cluster.getPlist().size());
-                        similarityData.put("update_time", DateUtil.getTimeNow());
-                        String macs = cluster.getCombineMacs();
-                        String es_macs = similarityData.get("macs").toString();
-                        similarityData.put("macs", mergeMacs(macs, es_macs));
-                        esDao.update(index, type, similarityData);
-                    } else {
-                        Map<String, Object> es_data = new HashMap<>();
-                        es_data.put("id", UUID.randomUUID().toString());
-                        es_data.put("imei", imei);
-                        es_data.put("lng", mean.getX());
-                        es_data.put("lat", mean.getY());
-                        es_data.put("macs", cluster.getCombineMacs());
-                        String gid = uuid();
-//                        es_data.put("gid", cluster.getNum());
-                        es_data.put("gid", gid);
-                        es_data.put("is_valid", 0);
-                        es_data.put("model", 0);
-                        es_data.put("counts", cluster.getPlist().size());
-                        es_data.put("update_time", DateUtil.getTimeNow());
-                        es_data.put("create_time", DateUtil.getTimeNow());
-                        es_data.put("radius",radius);
-                        String latlng = mean.getY() + "," + mean.getX();
-                        String gname = PoiUtils.geocode2(geoUrl, geoToken, latlng);
-                        if (gname != null)
-                            es_data.put("gname", gname);
-                        esDataList.add(es_data);
-                    }
-                    */
-                    
-                    
                     //add by wg.he 11/01/2017
                     if(exists_similar_point == 0){
                     	Map<String, Object> es_data = new HashMap<>();
@@ -276,14 +265,53 @@ public class DbScanService {
                             es_data.put("gname", gname);
                         esDataList.add(es_data);
                     }
+                    
+                    if(cluster.getType()==0)
+                    {
+                    	if(homeData == null)
+                    	{
+                    		homeData = getMQData(imei, cluster);
+                    	}
+                    }
+                    else
+                    {
+                    	if(schoolData == null)
+                    	{
+                    		schoolData = getMQData(imei, cluster);
+                    	}
+                    }
                 }
                 if (esDataList.size() > 0) {
                     esDao.index(index, type, esDataList);
+                }
+                if(isTuQiang)
+	            {
+	                //家和学校的各发一条到mq
+	                if(homeData != null)
+	                {
+	                	activation_producer.send(JSONObject.toJSONString(homeData));
+	                }
+	                if(schoolData!=null)
+	                {
+	                	activation_producer.send(JSONObject.toJSONString(schoolData));
+	                }
                 }
             }
         }
     }
 
+    private Point4MQ getMQData(String imei, Cluster cluster)
+    {
+    	Point4MQ data = new Point4MQ();
+    	data.setCounts(cluster.getPlist().size());
+    	data.setImei(imei);
+    	data.setLat(cluster.getMean().getY());
+    	data.setLng(cluster.getMean().getX());
+    	data.setType(cluster.getType());
+    	data.setCreate_time(new Date());
+    	return data;
+    }
+    
     /**
      * 转换mac由原来|转为空格分隔
      *

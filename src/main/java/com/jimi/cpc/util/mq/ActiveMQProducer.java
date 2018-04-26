@@ -21,6 +21,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.log4j.Logger;
 
 import com.google.common.collect.Maps;
+import com.jimi.cpc.util.Constants;
 
 public class ActiveMQProducer {
 
@@ -102,9 +103,9 @@ public class ActiveMQProducer {
 	
 	private static String getMqKey(JMSMode mode, String target) {
 		if (StringUtils.isBlank(target)) {
-			return mode.getName() + "." + MqConstants.PROJECT_NAME;
+			return mode.getName() + "." + Constants.PROJECT_NAME;
 		} else {
-			return mode.getName() + "." + MqConstants.PROJECT_NAME + "." + target;
+			return mode.getName() + "." + Constants.PROJECT_NAME + "." + target;
 		}
 	}
 
@@ -177,11 +178,11 @@ public class ActiveMQProducer {
 		if (null == connection) {
 			try {
 				// failover:(tcp://primary:61616)?timeout=3000
-				String brokerURL = "failover:(" + MqConstants.MQ_URL + ")";
+				String brokerURL = "failover:(" + Constants.MQ_URL + ")";
 				logger.info(" ready connect to activemq: " + brokerURL);
 				factory = new ActiveMQConnectionFactory(brokerURL);
-				factory.setUserName(MqConstants.MQ_USER);
-				factory.setPassword(MqConstants.MQ_PWD);
+				factory.setUserName(Constants.MQ_USER);
+				factory.setPassword(Constants.MQ_PWD);
 				// ACK配置
 				// factory.setOptimizeAcknowledge(true);
 				// factory.setUseAsyncSend(true);

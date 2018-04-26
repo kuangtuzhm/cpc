@@ -6,7 +6,7 @@ import java.util.List;
  * 聚类集群
  * @author  yuanshao
  */
-public class Cluster {
+public class Cluster implements Comparable<Cluster>{
     private List<Point> plist;
     private Point center;
     private Point mean;
@@ -60,6 +60,21 @@ public class Cluster {
 
 	public void setType(int type) {
 		this.type = type;
+	}
+
+	@Override
+	public int compareTo(Cluster o) {
+		int size = 0;
+		int oSize = 0;
+		if(this.plist != null)
+		{
+			size = this.plist.size();
+		}
+		if(o.plist != null)
+		{
+			oSize = o.plist.size();
+		}
+		return (oSize - size);
 	}
     
 }
