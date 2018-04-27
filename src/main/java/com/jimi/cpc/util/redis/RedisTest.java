@@ -9,9 +9,9 @@ import com.jimi.cpc.util.Constants;
 public class RedisTest {
 
 	public static void main(String[] args) {
-		//868111111111100   868111111111111  868111111111112  868111111111110
+		//868111111111100   868111111111111  868111111111112  868111111111110 351609080199717
 		RedisTest t = new RedisTest();
-		String imei="868111111111110";
+		String imei="351609080199717";
 		String imeiAppId = t.get(imei);
 		System.out.println(imeiAppId);
 		if(StringUtils.isEmpty(imeiAppId))
