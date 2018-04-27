@@ -289,11 +289,11 @@ public class DbScanService {
 	                //家和学校的各发一条到mq
 	                if(homeData != null)
 	                {
-	                	activation_producer.send(JSONObject.toJSONString(homeData));
+	                	activation_producer.send(JSONObject.toJSONString(homeData).getBytes());
 	                }
 	                if(schoolData!=null)
 	                {
-	                	activation_producer.send(JSONObject.toJSONString(schoolData));
+	                	activation_producer.send(JSONObject.toJSONString(schoolData).getBytes());
 	                }
                 }
             }
